@@ -11,6 +11,15 @@ import RatingControl from './RatingControl';
 import ratingControlTester from '../ratingControlTester';
 import schema from '../schema.json';
 import uischema from '../uischema.json';
+import Ajv, { ErrorObject } from 'ajv';
+import addFormats from 'ajv-formats';
+
+const ajv = new Ajv({
+  allErrors: true,
+  verbose: true,
+  strict: false,
+});
+addFormats(ajv);
 
 const classes = {
   container: {
@@ -39,12 +48,17 @@ const classes = {
 };
 
 const initialData = {
-  name: 'Send email to Adrian',
-  description: 'Confirm if you have passed the subject\nHereby ...',
-  done: true,
-  recurrence: 'Daily',
-  rating: 3,
-};
+  "comments": [
+    {
+      "name": "John Doe",
+      "message": "This is an example message"
+    },
+    {
+      "name": "Max Mustermann",
+      "message": "Another message"
+    }
+  ]
+}
 
 const renderers = [
   ...materialRenderers,
@@ -52,9 +66,17 @@ const renderers = [
   { tester: ratingControlTester, renderer: RatingControl },
 ];
 
+/**
+ * The `JsonFormsDemo` component is a React functional component that renders a form using the `JsonForms` library. It displays the bound data in a pre-formatted block and provides a button to clear the data.
+ *
+ * The component uses the `useState` and `useMemo` hooks to manage the state of the form data and the stringified version of the data. It also handles custom validation errors and displays them in the form.
+ *
+ * The `JsonForms` component is configured with a schema, UI schema, renderers, and cells. The `onChange` callback is used to update the form data and handle custom validation errors.
+ */
 export const JsonFormsDemo: FC = () => {
   const [data, setData] = useState<object>(initialData);
   const stringifiedData = useMemo(() => JSON.stringify(data, null, 2), [data]);
+  const [additionalErrors, setAdditionalErrors] = useState<ErrorObject[]>([]);
 
   const clearData = () => {
     setData({});
@@ -88,7 +110,61 @@ export const JsonFormsDemo: FC = () => {
             data={data}
             renderers={renderers}
             cells={materialCells}
-            onChange={({ data }) => setData(data)}
+            onChange={({ data, errors }) => {
+                setData(data);
+                
+                const customErrors: ErrorObject[] = [];
+                const nameSet = new Set();
+                const messageSet = new Set();
+              
+                data.comments?.forEach((comment: { name?: string; message?: string }, index: number) => {
+                  if (!comment.name) {
+                    customErrors.push({
+                      instancePath: `/comments/${index}/name`,
+                      message: `Name is required for comment ${index + 1}`,
+                      schemaPath: '',
+                      keyword: 'required',
+                      params: {}
+                    });
+                  } else if (nameSet.has(comment.name)) {
+                    customErrors.push({
+                      instancePath: `/comments/${index}/name`,
+                      message: `Duplicate name: ${comment.name}`,
+                      schemaPath: '',
+                      keyword: 'unique',
+                      params: {}
+                    });
+                  } else {
+                    nameSet.add(comment.name);
+                  }
+              
+                  if (!comment.message) {
+                    customErrors.push({
+                      instancePath: `/comments/${index}/message`,
+                      message: `Message is required for comment ${index + 1}`,
+                      schemaPath: '',
+                      keyword: 'required',
+                      params: {}
+                    });
+                  } else if (messageSet.has(comment.message)) {
+                    customErrors.push({
+                      instancePath: `/comments/${index}/message`,
+                      message: `Duplicate message: ${comment.message}`,
+                      schemaPath: '',
+                      keyword: 'unique',
+                      params: {}
+                    });
+                  } else {
+                    messageSet.add(comment.message);
+                  }
+                });              
+                setAdditionalErrors(customErrors);
+              
+                console.log('All errors:', [...customErrors]);
+              }}                          
+            
+            validationMode='ValidateAndShow'
+            additionalErrors={additionalErrors}
           />
         </div>
       </Grid>
